@@ -1,0 +1,24 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.directiq/mcp",
+  "title": "DirectIQ",
+  "description": "Manage DirectIQ contacts, lists and tags, and send transactional email from any AI agent.",
+  "version": "0.1.0",
+  "websiteUrl": "https://www.directiq.com/mcp-setup/",
+  "repository": { "url": "https://github.com/directiq/mcp", "source": "github" },
+  "icons": [{ "src": "https://www.directiq.com/img/directiq-logo.svg", "mimeType": "image/svg+xml" }],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.directiq.com/mcp",
+      "headers": [
+        {
+          "name": "x-api-key",
+          "description": "DirectIQ API key (Dashboard > Settings > API Keys)",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
