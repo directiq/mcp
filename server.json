@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "com.directiq/mcp",
+  "name": "com.directiq.mcp/directiq",
   "title": "DirectIQ",
   "description": "Manage DirectIQ contacts, lists and tags, and send transactional email from any AI agent.",
   "version": "0.1.0",

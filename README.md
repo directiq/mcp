@@ -1,6 +1,6 @@
 # DirectIQ MCP Server
 
-[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-com.directiq%2Fmcp-blue)](https://registry.modelcontextprotocol.io/v0.1/servers?search=com.directiq/mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-com.directiq.mcp%2Fdirectiq-blue)](https://registry.modelcontextprotocol.io/v0.1/servers?search=com.directiq.mcp/directiq)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Connect Claude, ChatGPT, Cursor, VS Code, Windsurf, and any other [Model Context Protocol](https://modelcontextprotocol.io) client to your **DirectIQ** account. Manage contacts, lists, and tags, get an account overview, and send transactional email in plain language.
@@ -11,7 +11,7 @@ DirectIQ is an email marketing and transactional email platform for small busine
 - **Transport:** Streamable HTTP (remote, hosted by DirectIQ, nothing to install)
 - **Auth:** DirectIQ API key in the `x-api-key` header, or `Authorization: Bearer <key>` (OAuth coming soon)
 - **Server card:** `https://mcp.directiq.com/.well-known/mcp/server-card.json`
-- **Registry name:** `com.directiq/mcp`
+- **Registry name:** `com.directiq.mcp/directiq`
 
 > This repository holds the public documentation, registry metadata, and client configuration for the hosted DirectIQ MCP server at `mcp.directiq.com`, operated by DirectIQ. There is nothing to install or build.
 
