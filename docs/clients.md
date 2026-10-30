@@ -5,7 +5,7 @@ Endpoint: `https://mcp.directiq.com/mcp` · Header: `x-api-key: YOUR_DIRECTIQ_AP
 ## Client setup
 
 ### Cursor
-[Add to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=directiq&config=eyJ1cmwiOiJodHRwczovL21jcC5kaXJlY3RpcS5jb20vbWNwIiwiaGVhZGVycyI6eyJ4LWFwaS1rZXkiOiJZT1VSX0RJUkVDVElRX0FQSV9LRVkifX0=). This link opens Cursor with the config filled in. Replace `YOUR_DIRECTIQ_API_KEY` with your key.
+[Add to Cursor](https://www.directiq.com/mcp/cursor/). This link opens Cursor with the config filled in. Replace `YOUR_DIRECTIQ_API_KEY` with your key.
 
 Or add it manually to `~/.cursor/mcp.json`:
 ```json

@@ -1,7 +1,7 @@
 {
   "serverInfo": {
     "name": "directiq-mcp",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "authentication": {
     "required": true,
@@ -15,22 +15,40 @@
   },
   "tools": [
     {
-      "name": "directiq_get_contact",
-      "description": "Get a single contact by its numeric ID.",
+      "name": "directiq_account_overview",
+      "description": "Summarize the account in one call: total contacts, active/disabled status counts, list count, tag count, and confirmed sender addresses. A good first call in a conversation, and the way to find a valid \"from\" address for directiq_send_email. Each section that fails to load is returned as { error } without failing the rest.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Account Overview",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_get_contact",
+      "description": "Get one contact by numeric ID: email, first and last name, status, created and updated dates, tags, lists, and notes. Use when you already have the ID; to find a contact, page through directiq_list_contacts. Returns an error if no contact has that ID.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Numeric contact ID"
+            "maximum": 9007199254740991,
+            "description": "Numeric contact ID (from directiq_list_contacts or directiq_get_contact)"
           }
         },
         "required": [
           "id"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "Get Contact",
@@ -42,24 +60,25 @@
     },
     {
       "name": "directiq_list_contacts",
-      "description": "List contacts, optionally paginated.",
+      "description": "List contacts one page at a time, oldest first, with each contact's ID, email, name, status, tags, and lists. Returns { pageNumber, totalCount, result, hasNextPage }; request the next pageNumber while hasNextPage is true. Use to browse contacts or find an ID. For just the total, use directiq_contact_count instead.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
-          "page": {
+          "pageNumber": {
+            "description": "1-based page number (default 1)",
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "1-based page number"
+            "maximum": 9007199254740991
           },
           "pageSize": {
+            "description": "Results per page, 50–500 (default 50)",
             "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 500,
-            "description": "Results per page (max 500)"
+            "minimum": 50,
+            "maximum": 500
           }
         },
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "List Contacts",
@@ -71,12 +90,12 @@
     },
     {
       "name": "directiq_contact_count",
-      "description": "Get the total number of contacts in the account.",
+      "description": "Return the total number of contacts in the account as a single number. Use for a quick count; for counts plus active/disabled status, lists, tags, and senders, use directiq_account_overview.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {},
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "Contact Count",
@@ -87,28 +106,82 @@
       }
     },
     {
-      "name": "directiq_update_contact",
-      "description": "Update a contact by ID. Provide the fields to change (e.g. firstName, lastName, email).",
+      "name": "directiq_upsert_contact",
+      "description": "Add a contact to a list, creating the contact if the email is new or updating its name if it already exists. Optionally applies tags (created if missing). Use this to create contacts; to change other fields on an existing contact, use directiq_update_contact. Returns import counts (inserted, alreadyExisting, addedToList); emails on a suppression or bounce list are counted but not added.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric list ID (from directiq_list_lists)"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "description": "Contact email address"
+          },
+          "firstName": {
+            "description": "First name; overwrites the existing value",
+            "type": "string"
+          },
+          "lastName": {
+            "description": "Last name; overwrites the existing value",
+            "type": "string"
+          },
+          "tags": {
+            "description": "Tag names to apply; missing tags are created",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "listId",
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Add or Update Contact",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_update_contact",
+      "description": "Update fields on an existing contact by ID, such as firstName, lastName, or email. Only the fields you pass change, and they overwrite the current values. To create a contact, use directiq_upsert_contact; to change list or tag membership, use the list and tag tools.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Numeric contact ID"
+            "maximum": 9007199254740991,
+            "description": "Numeric contact ID (from directiq_list_contacts or directiq_get_contact)"
           },
           "fields": {
             "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
             "additionalProperties": {},
-            "description": "Object of contact fields to update"
+            "description": "Contact fields to change, e.g. {\"firstName\": \"Jamie\"}"
           }
         },
         "required": [
           "id",
           "fields"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "Update Contact",
@@ -119,13 +192,40 @@
       }
     },
     {
-      "name": "directiq_list_lists",
-      "description": "List all contact lists.",
+      "name": "directiq_delete_contact",
+      "description": "Permanently delete a contact by ID, removing it from every list and tag. This cannot be undone. Confirm with the user first; to only take a contact off one list, use directiq_remove_contact_from_list.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric contact ID (from directiq_list_contacts or directiq_get_contact)"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Delete Contact",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_list_lists",
+      "description": "List every contact list in the account with its ID and name. Use to find a list ID before adding contacts, sending campaigns, or calling directiq_get_list.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {},
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "List Contact Lists",
@@ -137,21 +237,22 @@
     },
     {
       "name": "directiq_get_list",
-      "description": "Get a contact list by its numeric ID.",
+      "description": "Get one contact list by ID: name, created and modified dates, and total, active, and disabled contact counts. Use directiq_list_lists to find the ID. Returns an error if no list has that ID.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Numeric list ID"
+            "maximum": 9007199254740991,
+            "description": "Numeric list ID (from directiq_list_lists)"
           }
         },
         "required": [
           "id"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "Get Contact List",
@@ -163,22 +264,22 @@
     },
     {
       "name": "directiq_create_list",
-      "description": "Create a new contact list.",
+      "description": "Create a new, empty contact list and return it with its new ID. Calling it twice creates two lists with the same name, so check directiq_list_lists first. Add contacts afterwards with directiq_upsert_contact or directiq_add_contact_to_list.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "List name (max 200 characters)"
+            "description": "List name, 1–200 characters"
           }
         },
         "required": [
           "name"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "Create Contact List",
@@ -189,13 +290,159 @@
       }
     },
     {
-      "name": "directiq_list_tags",
-      "description": "List all tags.",
+      "name": "directiq_rename_list",
+      "description": "Rename a contact list by ID. Its contacts are unchanged; the previous name is overwritten.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric list ID (from directiq_list_lists)"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "New name, 1–200 characters"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Rename Contact List",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_delete_list",
+      "description": "Permanently delete a contact list by ID. The contacts themselves are kept, but their membership in this list is lost. This cannot be undone; confirm with the user first.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric list ID (from directiq_list_lists)"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Delete Contact List",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_add_contact_to_list",
+      "description": "Add an existing contact (by contact ID) to a list. Adding a contact that is already on the list has no effect. To add someone by email who may not exist yet, use directiq_upsert_contact.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric list ID (from directiq_list_lists)"
+          },
+          "contactId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric contact ID (from directiq_list_contacts or directiq_get_contact)"
+          }
+        },
+        "required": [
+          "listId",
+          "contactId"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Add Contact to List",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_remove_contact_from_list",
+      "description": "Remove a contact from one list. The contact stays in the account and on its other lists; to delete the contact entirely, use directiq_delete_contact.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric list ID (from directiq_list_lists)"
+          },
+          "contactId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric contact ID (from directiq_list_contacts or directiq_get_contact)"
+          }
+        },
+        "required": [
+          "listId",
+          "contactId"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Remove Contact from List",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_list_segments",
+      "description": "List saved segments (rule-based groups of contacts) with their IDs and names. Returns an empty array if the account has none. Segments are managed in the DirectIQ dashboard.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {},
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "List Segments",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_list_tags",
+      "description": "List every tag in the account with its ID and name. Use to check whether a tag exists or to find its ID before renaming or deleting it.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
       },
       "annotations": {
         "title": "List Tags",
@@ -207,21 +454,22 @@
     },
     {
       "name": "directiq_get_tag",
-      "description": "Get a tag by its numeric ID.",
+      "description": "Get one tag by ID with its name and details. Use directiq_list_tags to find the ID. Returns an error if no tag has that ID.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Numeric tag ID"
+            "maximum": 9007199254740991,
+            "description": "Numeric tag ID (from directiq_list_tags)"
           }
         },
         "required": [
           "id"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "Get Tag",
@@ -233,8 +481,9 @@
     },
     {
       "name": "directiq_create_tag",
-      "description": "Create a new tag.",
+      "description": "Create a new tag and return it with its ID. Check directiq_list_tags first to avoid duplicates. To tag a contact, use directiq_tag_contact, which also creates missing tags.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "name": {
@@ -246,8 +495,7 @@
         "required": [
           "name"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "Create Tag",
@@ -258,50 +506,323 @@
       }
     },
     {
-      "name": "directiq_send_email",
-      "description": "Send a transactional email.",
+      "name": "directiq_rename_tag",
+      "description": "Rename a tag by ID. Contacts keep the tag under its new name; the previous name is overwritten.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric tag ID (from directiq_list_tags)"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "New tag name"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Rename Tag",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_delete_tag",
+      "description": "Permanently delete a tag by ID and remove it from every contact. Contacts are kept. This cannot be undone; confirm with the user first.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric tag ID (from directiq_list_tags)"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Delete Tag",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_tag_contact",
+      "description": "Apply one or more tags to a contact by contact ID. Tags that do not exist yet are created. Applying a tag the contact already has has no effect.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric contact ID (from directiq_list_contacts or directiq_get_contact)"
+          },
+          "tags": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Tag names to apply"
+          }
+        },
+        "required": [
+          "contactId",
+          "tags"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Tag Contact",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_untag_contact",
+      "description": "Remove a tag from a contact, identified by the contact email and the tag name. The tag itself and the contact are kept; to delete the tag everywhere, use directiq_delete_tag.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "description": "Contact email address"
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tag name to remove"
+          }
+        },
+        "required": [
+          "email",
+          "tag"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Untag Contact",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_list_campaigns",
+      "description": "List email campaigns and automation flows with ID, name, type (Regular or Flow), status, subject, sender, target lists, recipient count, and scheduled send time. Returns { campaigns, nextPageToken }; pass nextPageToken back to get the next page (null means no more). Use the IDs with directiq_campaign_stats for performance.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "nextPageToken": {
+            "description": "Token from the previous page; omit for the first page",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "List Campaigns",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_get_campaign",
+      "description": "Get one campaign by ID: name, type, status, subject, sender, target lists and segments, template ID, recipient count, and scheduled send time. For opens, clicks, and other results, use directiq_campaign_stats.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric campaign ID (from directiq_list_campaigns)"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Get Campaign",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_campaign_stats",
+      "description": "Summarize how a campaign performed: counts of recipients, opens, clicks, bounces, unsubscribes, and complaints, plus open, click, bounce, and unsubscribe rates as percentages of recipients. Use directiq_campaign_report to see which contacts did what. A section that fails to load is returned as an error without failing the rest.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric campaign ID (from directiq_list_campaigns)"
+          }
+        },
+        "required": [
+          "campaignId"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Campaign Stats",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_campaign_report",
+      "description": "List the contacts behind one campaign result, one page at a time: who received, opened, clicked, bounced, unsubscribed, or complained. Returns { totalCount, result }. Optionally filter to one email address, or for clicks, to one link. For totals and rates only, use directiq_campaign_stats.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric campaign ID (from directiq_list_campaigns)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "recipients",
+              "opens",
+              "clicks",
+              "bounces",
+              "unsubscribes",
+              "complaints"
+            ],
+            "description": "Which result to list"
+          },
+          "email": {
+            "description": "Only return rows for this contact email",
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "link": {
+            "description": "For type \"clicks\" only: only return clicks on this URL",
+            "type": "string"
+          },
+          "pageNumber": {
+            "description": "1-based page number (default 1)",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "description": "Results per page, up to 500",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "campaignId",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Campaign Report",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "directiq_send_email",
+      "description": "Send one transactional email (a receipt, confirmation, or one-to-one message) immediately. It is delivered to real recipients and cannot be recalled, and it counts toward the account’s sending plan. The from address must be a confirmed sender on the account (see directiq_account_overview). Not for bulk marketing: campaigns are sent from the DirectIQ dashboard.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "from": {
             "type": "string",
             "format": "email",
-            "description": "Sender email address (must be a confirmed sender)"
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "description": "Sender address; must be a confirmed sender on the account"
           },
           "to": {
             "type": "string",
             "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
             "description": "Recipient email address"
           },
           "subject": {
             "type": "string",
             "minLength": 2,
-            "description": "Email subject (min 2 characters)"
+            "description": "Subject line, at least 2 characters"
           },
           "content": {
             "type": "string",
             "minLength": 2,
-            "description": "Email body (HTML or text, min 2 characters)"
+            "description": "Message body as HTML or plain text, at least 2 characters"
           },
           "fromName": {
-            "type": "string",
-            "description": "Sender display name"
+            "description": "Sender display name, e.g. \"Acme Support\"",
+            "type": "string"
           },
           "cc": {
+            "description": "CC recipient addresses",
             "type": "array",
             "items": {
               "type": "string",
-              "format": "email"
-            },
-            "description": "CC recipients"
+              "format": "email",
+              "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
           },
           "bcc": {
+            "description": "BCC recipient addresses",
             "type": "array",
             "items": {
               "type": "string",
-              "format": "email"
-            },
-            "description": "BCC recipients"
+              "format": "email",
+              "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
           }
         },
         "required": [
@@ -310,8 +831,7 @@
           "subject",
           "content"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "Send Transactional Email",
@@ -322,35 +842,18 @@
       }
     },
     {
-      "name": "directiq_account_overview",
-      "description": "Summarize the account: total contacts, active/disabled status counts, list count, tag count, and confirmed sender addresses. Individual sections degrade gracefully if unavailable.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
-      },
-      "annotations": {
-        "title": "Account Overview",
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      }
-    },
-    {
       "name": "directiq_list_endpoints",
       "description": "List known DirectIQ API operations (HTTP method, API group, path, summary). Optionally filter by a search term. Call GET operations with directiq_read_request and POST/PUT/PATCH/DELETE operations with directiq_write_request.",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "search": {
-            "type": "string",
-            "description": "Optional case-insensitive filter matched against each operation path or summary"
+            "description": "Optional case-insensitive filter matched against each operation path or summary",
+            "type": "string"
           }
         },
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "List DirectIQ Endpoints",
@@ -362,8 +865,9 @@
     },
     {
       "name": "directiq_read_request",
-      "description": "Issue an authenticated GET request to any DirectIQ endpoint. Use directiq_list_endpoints to discover GET operations (group, path) that have no dedicated tool. Full request/response schemas for each group are in the DirectIQ API docs at https://rest.directiq.com/{group}/swagger/index.html (core, contacts, subscription).",
+      "description": "Issue an authenticated GET request to any DirectIQ endpoint and return the JSON response. Prefer a dedicated directiq_* tool when one exists; use this for read operations without one, found with directiq_list_endpoints (e.g. segments for a contact, email client reports). Full request/response schemas for each group are in the DirectIQ API docs at https://rest.directiq.com/{group}/swagger/index.html (core, contacts, subscription).",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "group": {
@@ -382,23 +886,25 @@
             "description": "Endpoint path within the group, e.g. '/contact/list' or '/email/send'"
           },
           "query": {
+            "description": "Optional query parameters",
             "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
             "additionalProperties": {
               "type": [
                 "string",
                 "number",
                 "boolean"
               ]
-            },
-            "description": "Optional query parameters"
+            }
           }
         },
         "required": [
           "group",
           "path"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "DirectIQ Read Request",
@@ -410,8 +916,9 @@
     },
     {
       "name": "directiq_write_request",
-      "description": "Issue an authenticated POST, PUT, PATCH, or DELETE request to any DirectIQ endpoint. May create, modify, or permanently delete account data. Use directiq_list_endpoints to discover operations (method, group, path) that have no dedicated tool. Full request/response schemas for each group are in the DirectIQ API docs at https://rest.directiq.com/{group}/swagger/index.html (core, contacts, subscription).",
+      "description": "Issue an authenticated POST, PUT, PATCH, or DELETE request to any DirectIQ endpoint. May create, modify, or permanently delete account data, including bulk operations. Prefer a dedicated directiq_* tool when one exists; use this only for operations without one, found with directiq_list_endpoints, and confirm destructive calls with the user first. Full request/response schemas for each group are in the DirectIQ API docs at https://rest.directiq.com/{group}/swagger/index.html (core, contacts, subscription).",
       "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "group": {
@@ -440,28 +947,34 @@
             "description": "Endpoint path within the group, e.g. '/contact/list' or '/email/send'"
           },
           "query": {
+            "description": "Optional query parameters",
             "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
             "additionalProperties": {
               "type": [
                 "string",
                 "number",
                 "boolean"
               ]
-            },
-            "description": "Optional query parameters"
+            }
           },
           "body": {
+            "description": "Optional JSON request body: an object, or an array for bulk operations",
             "anyOf": [
               {
                 "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
                 "additionalProperties": {}
               },
               {
                 "type": "array",
                 "items": {}
               }
-            ],
-            "description": "Optional JSON request body: an object, or an array for bulk operations"
+            ]
           }
         },
         "required": [
@@ -469,8 +982,7 @@
           "method",
           "path"
         ],
-        "additionalProperties": false,
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "additionalProperties": false
       },
       "annotations": {
         "title": "DirectIQ Write Request",

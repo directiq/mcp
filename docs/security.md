@@ -8,7 +8,7 @@ The server uses your DirectIQ API key. OAuth is planned.
 2. Go to **Settings → API Keys** and copy a key, or generate a new one.
 3. Send it with every request in the `x-api-key` header. `Authorization: Bearer <key>` also works.
 
-`initialize` and `tools/list` work without a key, so clients and directories can see which tools exist. Every `tools/call` needs a key.
+`initialize` and `tools/list` work without a key, so clients and directories can see which tools exist. A `tools/call` without a key is rejected with HTTP 401 and `WWW-Authenticate: ApiKey header="x-api-key"`.
 
 ## What the key can do
 
@@ -25,10 +25,13 @@ The server acts with the full permissions of the DirectIQ account the key belong
 
 | Tool | Effect |
 |---|---|
-| `directiq_send_email` | Sends a real email from a confirmed sender on your account |
-| `directiq_create_list`, `directiq_create_tag` | Create lists and tags |
-| `directiq_update_contact` | Overwrites contact fields |
-| `directiq_write_request` | Any POST/PUT/PATCH/DELETE on the DirectIQ API; can permanently delete data |
+| `directiq_send_email` | Sends a real email from a confirmed sender on your account; can't be recalled |
+| `directiq_delete_contact`, `directiq_delete_list`, `directiq_delete_tag` | Permanently delete a contact, list, or tag |
+| `directiq_upsert_contact`, `directiq_update_contact` | Create contacts or overwrite contact fields |
+| `directiq_rename_list`, `directiq_rename_tag` | Overwrite a list or tag name |
+| `directiq_remove_contact_from_list`, `directiq_untag_contact` | Remove list membership or a tag from a contact |
+| `directiq_create_list`, `directiq_create_tag`, `directiq_add_contact_to_list`, `directiq_tag_contact` | Add lists, tags, or memberships |
+| `directiq_write_request` | Any POST/PUT/PATCH/DELETE on the DirectIQ API, including bulk deletes |
 
 Every tool declares MCP annotations so clients can ask before running these. Keep your client's tool-approval prompts on, and only auto-approve read-only tools.
 
