@@ -3,6 +3,7 @@
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-com.directiq.mcp%2Fdirectiq-blue)](https://registry.modelcontextprotocol.io/v0.1/servers?search=com.directiq.mcp/directiq)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![DirectIQ MCP connector](https://glama.ai/mcp/connectors/com.directiq.mcp/directiq/badges/score.svg)](https://glama.ai/mcp/connectors/com.directiq.mcp/directiq)
+[![mcptry](https://mcptry.com/badge/com.directiq.mcp/directiq)](https://mcptry.com/servers/com.directiq.mcp/directiq)
 
 Connect Claude, ChatGPT, Cursor, VS Code, Windsurf, and any other [Model Context Protocol](https://modelcontextprotocol.io) client to your **DirectIQ** account. Manage contacts, lists, and tags, see how your campaigns performed, and send transactional email in plain language.
 
